@@ -94,7 +94,7 @@ export default function App() {
             {steps.map((step, index) => {
               const done = index === 0 && connected;
               const current = index === (connected ? 1 : 0);
-              return <div key={step.number} className={`step ${current ? "current" : ""} ${done ? "done" : ""}`}>
+              return <div key={step.number} className={\`step \${current ? "current" : ""} \${done ? "done" : ""}\`}>
                 <div className="step-number">{done ? <Check size={16} /> : step.number}</div>
                 <div className="step-copy"><strong>{step.title}</strong><small>{step.description}</small></div>
                 {index < steps.length - 1 && <div className="step-connector" />}
@@ -108,7 +108,7 @@ export default function App() {
                 <label htmlFor="connection-string">MongoDB connection string <span className="required">*</span></label>
                 <div className="input-wrap"><LockKeyhole size={17} className="input-leading" /><input id="connection-string" type={showUri ? "text" : "password"} autoComplete="off" spellCheck={false} placeholder="mongodb+srv://username:password@cluster..." value={connectionString} onChange={(event) => { setConnectionString(event.target.value); setConnected(false); setNotice(null); }} required minLength={12} aria-describedby="uri-help" /><button type="button" className="input-action" onClick={() => setShowUri(!showUri)}>{showUri ? "Hide" : "Show"}</button></div>
                 <div id="uri-help" className="field-help"><LockKeyhole size={13} /> Used only for this test. Never stored in browser storage.</div>
-                {notice && <div className={`notice ${notice.kind}`} role="status">{notice.kind === "error" ? <TriangleAlert size={16} /> : notice.kind === "success" ? <Check size={16} /> : <CircleHelp size={16} />}<span>{notice.text}</span><button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}><X size={14} /></button></div>}
+                {notice && <div className={\`notice \${notice.kind}\`} role="status">{notice.kind === "error" ? <TriangleAlert size={16} /> : notice.kind === "success" ? <Check size={16} /> : <CircleHelp size={16} />}<span>{notice.text}</span><button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}><X size={14} /></button></div>}
                 <div className="form-actions"><button type="submit" className="button-primary" disabled={connecting || !connectionString.trim()}>{connecting ? <><LoaderCircle className="spin" size={16} /> Testing connection…</> : <><Plug size={16} /> Test connection</>}</button>{connected && <button type="button" className="button-secondary" onClick={disconnect}>Clear connection</button>}</div>
               </form>
               <div className="connection-footnote"><ShieldCheck size={16} /><span><strong>Recommended:</strong> use a database user with only the permissions needed for your import.</span></div>
