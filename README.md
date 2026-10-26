@@ -34,7 +34,7 @@ The connection-test endpoint creates a temporary MongoClient and closes it after
 
 - Do not persist Atlas connection strings.
 - Existing and new databases/collections will be supported.
-- Imports will use ordered inserts. A duplicate `_id` stops the import and reports any partial success; previously inserted documents are not rolled back automatically.
+- Imports will use ordered insertion. A duplicate `_id` stops the import and reports any partial success; previously inserted documents are not rolled back automatically.
 - Planned file formats: JSON array, single object and NDJSON.
 - Planned initial upload limit: 10 MB.
 
