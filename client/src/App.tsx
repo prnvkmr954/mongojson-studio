@@ -15,6 +15,14 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [sessionLabel, setSessionLabel] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const [databases, setDatabases] = useState<string[]>([]);
+  const [collections, setCollections] = useState<string[]>([]);
+  const [selectedDatabase, setSelectedDatabase] = useState("");
+  const [selectedCollection, setSelectedCollection] = useState("");
+  const [newDatabase, setNewDatabase] = useState("");
+  const [newCollection, setNewCollection] = useState("");
+  const [destinationLoading, setDestinationLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -32,7 +40,57 @@ export default function App() {
     } catch (error) { setConnected(false); setNotice({kind:"error",text:error instanceof Error ? error.message : "Connection failed. Check the URI and try again."}); }
     finally { setConnecting(false); }
   }
-  function disconnect() { setConnected(false); setConnectionString(""); setSessionLabel(""); setNotice({kind:"info",text:"Connection string cleared from the form. No persistent session was opened by this test."}); }
+  async function openDestination() {
+    setNotice(null); setDestinationLoading(true);
+    try {
+      const opened = await fetch("/api/connections", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({connectionString}) });
+      const openedResult = await opened.json() as {sessionId?:string;message?:string};
+      if (!opened.ok || !openedResult.sessionId) throw new Error(openedResult.message || "Could not open a temporary Atlas session.");
+      const activeSession = openedResult.sessionId; setSessionId(activeSession);
+      const response = await fetch("/api/destinations/databases", {headers:{"X-Session-Id":activeSession}});
+      const result = await response.json() as {databases?:string[];message?:string};
+      if (!response.ok) throw new Error(result.message || "Could not load databases.");
+      setDatabases(result.databases || []); setSelectedDatabase(""); setCollections([]); setSelectedCollection("");
+      setNotice({kind:"success",text:"Temporary Atlas session opened. Choose or create a database below."});
+    } catch (error) { setNotice({kind:"error",text:error instanceof Error ? error.message : "Could not load destinations."}); }
+    finally { setDestinationLoading(false); }
+  }
+  async function loadCollections(database: string) {
+    setSelectedDatabase(database); setSelectedCollection(""); setCollections([]);
+    if (!database || !sessionId) return;
+    try {
+      const response = await fetch("/api/destinations/collections?database="+encodeURIComponent(database), {headers:{"X-Session-Id":sessionId}});
+      const result = await response.json() as {collections?:string[];message?:string};
+      if (!response.ok) throw new Error(result.message || "Could not load collections.");
+      setCollections(result.collections || []);
+    } catch (error) { setNotice({kind:"error",text:error instanceof Error ? error.message : "Could not load collections."}); }
+  }
+  async function createDatabase() {
+    const name = newDatabase.trim(); if (!name || !sessionId) return;
+    try {
+      const response = await fetch("/api/destinations/databases", {method:"POST",headers:{"Content-Type":"application/json","X-Session-Id":sessionId},body:JSON.stringify({database:name})});
+      const result = await response.json() as {message?:string};
+      if (!response.ok) throw new Error(result.message || "Could not create database.");
+      setDatabases(items=>[...new Set([...items,name])].sort()); setSelectedDatabase(name); setNewDatabase(""); setCollections([]);
+      setNotice({kind:"success",text:"Database prepared. Create a collection to persist it in MongoDB."});
+    } catch (error) { setNotice({kind:"error",text:error instanceof Error ? error.message : "Could not create database."}); }
+  }
+  async function createCollection() {
+    const name = newCollection.trim(); if (!name || !selectedDatabase || !sessionId) return;
+    try {
+      const response = await fetch("/api/destinations/collections", {method:"POST",headers:{"Content-Type":"application/json","X-Session-Id":sessionId},body:JSON.stringify({database:selectedDatabase,collection:name})});
+      const result = await response.json() as {message?:string};
+      if (!response.ok) throw new Error(result.message || "Could not create collection.");
+      setCollections(items=>[...new Set([...items,name])].sort()); setSelectedCollection(name); setNewCollection("");
+      setNotice({kind:"success",text:"Collection created. JSON upload and insertion are not implemented yet."});
+    } catch (error) { setNotice({kind:"error",text:error instanceof Error ? error.message : "Could not create collection."}); }
+  }
+  async function disconnect() {
+    if (sessionId) await fetch("/api/connections/current", {method:"DELETE",headers:{"X-Session-Id":sessionId}}).catch(()=>undefined);
+    setSessionId(""); setDatabases([]); setCollections([]); setSelectedDatabase(""); setSelectedCollection("");
+    setConnected(false); setConnectionString(""); setSessionLabel("");
+    setNotice({kind:"info",text:"Connection cleared and temporary Atlas session closed."});
+  }
   const cls = (...values: Array<string | false>) => values.filter(Boolean).join(" ");
 
   return <div className="app-shell">
@@ -61,8 +119,7 @@ export default function App() {
               <div className="connection-footnote"><ShieldCheck size={16}/><span><strong>Recommended:</strong> use a database user with only the permissions needed for your import.</span></div>
             </section>
             <aside className="panel next-panel"><div className="next-panel-heading"><div className="panel-icon muted"><Database size={18}/></div><div><h2>Next step</h2><p>Choose your destination</p></div></div>
-              <div className={cls("destination-preview",connected&&"unlocked")}><div className="preview-line"><span className="preview-glyph"><Database size={16}/></span><div><strong>Database</strong><small>Existing or create new</small></div><ChevronDown size={15}/></div><div className="tree-branch"/><div className="preview-line"><span className="preview-glyph collection"><FileJson size={16}/></span><div><strong>Collection</strong><small>Existing or create new</small></div><ChevronDown size={15}/></div></div>
-              <div className="locked-note">{connected?<Check size={15}/>:<LockKeyhole size={15}/>}<span>{connected?"Connection verified. Destination selection comes next.":"Test your connection to unlock destination selection."}</span></div><button className="button-secondary full-width" disabled={!connected} onClick={()=>setNotice({kind:"info",text:"Destination selection is part of the next implementation milestone."})}>Continue to destination <ArrowRight size={15}/></button>
+              {!sessionId ? <><div className={cls("destination-preview",connected&&"unlocked")}><div className="preview-line"><span className="preview-glyph"><Database size={16}/></span><div><strong>Database</strong><small>Load existing or create new</small></div><ChevronDown size={15}/></div><div className="tree-branch"/><div className="preview-line"><span className="preview-glyph collection"><FileJson size={16}/></span><div><strong>Collection</strong><small>Load existing or create new</small></div><ChevronDown size={15}/></div></div><div className="locked-note">{connected?<Check size={15}/>:<LockKeyhole size={15}/>}<span>{connected?"Connection verified. Open a temporary session to load destinations.":"Test your connection to unlock destination selection."}</span></div><button className="button-secondary full-width" disabled={!connected||destinationLoading} onClick={openDestination}>{destinationLoading?<><LoaderCircle className="spin" size={15}/> Loading destinations…</> : <>Continue to destination <ArrowRight size={15}/></>}</button></> : <div className="destination-controls"><label htmlFor="database-select">Database</label><select id="database-select" value={selectedDatabase} onChange={event=>loadCollections(event.target.value)}><option value="">Choose database…</option>{databases.map(name=><option key={name} value={name}>{name}</option>)}</select><div className="create-row"><input aria-label="New database name" placeholder="New database name" value={newDatabase} onChange={event=>setNewDatabase(event.target.value)}/><button className="button-secondary" onClick={createDatabase} disabled={!newDatabase.trim()}>Create</button></div><label htmlFor="collection-select">Collection</label><select id="collection-select" value={selectedCollection} onChange={event=>setSelectedCollection(event.target.value)} disabled={!selectedDatabase}><option value="">Choose collection…</option>{collections.map(name=><option key={name} value={name}>{name}</option>)}</select><div className="create-row"><input aria-label="New collection name" placeholder="New collection name" value={newCollection} onChange={event=>setNewCollection(event.target.value)}/><button className="button-secondary" onClick={createCollection} disabled={!selectedDatabase||!newCollection.trim()}>Create</button></div><div className="locked-note"><Check size={15}/><span>{selectedDatabase&&selectedCollection?"Destination selected: "+selectedDatabase+"."+selectedCollection:"Select or create a database and collection."}</span></div><button className="button-secondary full-width" onClick={disconnect}>Close Atlas session</button></div>}
             </aside>
           </div>
           <section className="security-strip"><div className="security-icon"><ShieldCheck size={20}/></div><div><strong>Your database credentials stay yours</strong><p>The app uses your URI only for the current test. Disconnect when you finish. Never paste production credentials into an untrusted deployment.</p></div><div className="security-meta"><span><Check size={13}/> No saved profiles</span><span><Check size={13}/> TLS connection</span></div></section>
