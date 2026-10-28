@@ -4,7 +4,7 @@ A guided web app for importing JSON documents into MongoDB Atlas.
 
 ## Current milestone
 
-This initial scaffold includes a responsive React/TypeScript dashboard and an Express API. The UI includes a session-only Atlas connection form and a connection-test action. Database and collection selection, JSON parsing, preview, and importing are next milestones.
+The app includes a React/TypeScript dashboard, session-only Atlas connection, database/collection selection, JSON preview and insertion, plus a backup uploader for multiple `.json` or `.bson` collection dump files.
 
 ## Stack
 
@@ -35,8 +35,8 @@ The connection-test endpoint creates a temporary MongoClient and closes it after
 - Do not persist Atlas connection strings.
 - Existing and new databases/collections will be supported.
 - Imports will use ordered inserts. A duplicate `_id` stops the import and reports any partial success; previously inserted documents are not rolled back automatically.
-- Planned file formats: JSON array, single object and NDJSON.
-- Planned initial upload limit: 10 MB.
+- JSON imports support a single object or an array of objects. Backup import supports multiple plain `.json` or concatenated `.bson` collection dump files: collection mode inserts selected files into one destination collection; database mode maps each filename to a collection name. BSON values are deserialized using the BSON library.
+- Backup upload limits default to 10 MB per file and 100 files per request, configurable with `MAX_UPLOAD_MB` (up to 100 MB). Database backup mode accepts collection `.json`/`.bson` files selected from a dump folder; it does not currently accept ZIP files or `mongodump --archive` files and does not restore indexes or collection options.
 
 ## Security
 
