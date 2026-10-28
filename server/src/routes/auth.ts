@@ -8,7 +8,7 @@ export const authRouter = Router();
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: "draft-7", legacyHeaders: false, message: { message: "Too many authentication attempts. Please try again later." } });
 const credentialsSchema = z.object({
   email: z.string().trim().email().max(254),
-  password: z.string().min(12, "Password must be at least 12 characters.").max(128).refine(value => !value.includes("\\u0000"), "Invalid password.")
+  password: z.string().min(12, "Password must be at least 12 characters.").max(128)
 });
 authRouter.post("/register", authLimiter, async (request, response) => {
   const parsed = credentialsSchema.safeParse(request.body);
