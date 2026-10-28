@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { connectionRouter } from "./routes/connections.js";
 import { destinationRouter } from "./routes/destinations.js";
 import { importRouter } from "./routes/imports.js";
+import { backupRouter } from "./routes/backups.js";
 export const app = express();
 app.disable("x-powered-by");
 app.use(cors({ origin: config.CLIENT_ORIGIN, methods: ["GET","POST","DELETE","OPTIONS"], allowedHeaders: ["Content-Type","X-Session-Id"] }));
@@ -12,6 +13,7 @@ app.get("/api/health", (_request, response) => response.json({ status: "ok", ser
 app.use("/api/connections", connectionRouter);
 app.use("/api/destinations", destinationRouter);
 app.use("/api/imports", importRouter);
+app.use("/api/imports/backup", backupRouter);
 app.use((_request, response) => response.status(404).json({ message: "Endpoint not found." }));
 const errors: ErrorRequestHandler = (error: unknown, _request, response, _next) => {
   const message = error instanceof Error ? error.message : "Unexpected server error.";
