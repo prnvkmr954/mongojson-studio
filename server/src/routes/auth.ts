@@ -11,7 +11,7 @@ export const authRouter = Router();
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: "draft-7", legacyHeaders: false, message: { message: "Too many authentication attempts. Please try again later." } });
 
 const googleOAuth = config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
-  ? new OAuth2Client(config.GOOGLE_CLIENT_ID, config.GOOGLE_CLIENT_SECRET, config.GOOGLE_REDIRECT_URI || `http://localhost:${config.PORT}/api/auth/google/callback`)
+  ? new OAuth2Client(config.GOOGLE_CLIENT_ID, config.GOOGLE_CLIENT_SECRET, config.GOOGLE_REDIRECT_URI || `${config.CLIENT_ORIGIN}/api/auth/google/callback`)
   : null;
 const GOOGLE_STATE_COOKIE = "mongojson_google_state";
 function setGoogleStateCookie(response: import("express").Response, state: string) {
