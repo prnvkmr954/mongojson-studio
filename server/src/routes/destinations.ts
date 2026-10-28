@@ -8,7 +8,7 @@ const nameSchema = z.string().trim().min(1).max(120).regex(/^[^.$\u0000-\u001f/\
 function sessionFrom(request: import("express").Request, response: import("express").Response) {
   const parsed = sessionIdSchema.safeParse(request.header("X-Session-Id"));
   if (!parsed.success) { response.status(401).json({ message: "Connection session missing or expired. Connect to Atlas again." }); return null; }
-  const session = getSession(parsed.data);
+  const session = getSession(parsed.data, request.authUser!.id);
   if (!session) { response.status(401).json({ message: "Connection session expired. Connect to Atlas again." }); return null; }
   return session;
 }
