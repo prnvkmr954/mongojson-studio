@@ -21,4 +21,5 @@ export async function openSession(uri:string, ownerId:string) {
 }
 export function getSession(id:string|undefined, ownerId:string) { if(!id)return null; const session=sessions.get(id); if(!session || session.ownerId !== ownerId)return null; if(session.expiresAt<=Date.now()){clearSession(id);return null;} scheduleExpiry(id,session); return session; }
 export function disconnectSession(id:string|undefined, ownerId:string) { if(id && sessions.get(id)?.ownerId === ownerId)clearSession(id); }
+export function disconnectUserSessions(ownerId:string) { for (const [id, session] of sessions) if (session.ownerId === ownerId) clearSession(id); }
 export async function closeAllSessions() { const all=[...sessions.values()]; for(const session of all)clearTimeout(session.timer); sessions.clear(); await Promise.allSettled(all.map(({client})=>client.close())); }
