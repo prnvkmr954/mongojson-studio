@@ -1,0 +1,1 @@
+Authentication uses a separate AUTH_MONGODB_URI and AUTH_DATABASE. Never reuse a customer's submitted Atlas URI for account storage.
