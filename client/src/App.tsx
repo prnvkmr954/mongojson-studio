@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { ArrowRight, Check, ChevronDown, CircleHelp, Clock3, Database, FileJson, FileUp, History, LayoutDashboard, LoaderCircle, LockKeyhole, Menu, Plug, ShieldCheck, TriangleAlert, X } from "lucide-react";
 
 type ApiStatus = "checking" | "online" | "offline";
 type Notice = { kind: "success" | "error" | "info"; text: string } | null;
+type JsonDocument = Record<string, unknown>;
 const steps = [{ number: "01", title: "Connect", description: "Connect securely to Atlas" }, { number: "02", title: "Destination", description: "Choose a database and collection" }, { number: "03", title: "Import", description: "Preview and insert your JSON" }];
 
 export default function App() {
@@ -23,6 +24,10 @@ export default function App() {
   const [newDatabase, setNewDatabase] = useState("");
   const [newCollection, setNewCollection] = useState("");
   const [destinationLoading, setDestinationLoading] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const [previewDocuments, setPreviewDocuments] = useState<JsonDocument[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{insertedCount:number;database:string;collection:string}|null>(null);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +89,31 @@ export default function App() {
       setCollections(items=>[...new Set([...items,name])].sort()); setSelectedCollection(name); setNewCollection("");
       setNotice({kind:"success",text:"Collection created. JSON upload and insertion are not implemented yet."});
     } catch (error) { setNotice({kind:"error",text:error instanceof Error ? error.message : "Could not create collection."}); }
+  }
+  async function readJsonFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]; if (!file) return;
+    setNotice(null); setImportResult(null); setPreviewDocuments([]); setSelectedFileName("");
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("File is larger than 10 MB. Choose a smaller JSON file.");
+      const parsed: unknown = JSON.parse(await file.text());
+      const docs = Array.isArray(parsed) ? parsed : [parsed];
+      if (!docs.length) throw new Error("The JSON file contains no documents.");
+      if (!docs.every(item => item !== null && typeof item === "object" && !Array.isArray(item))) throw new Error("JSON must be an object or an array of objects.");
+      setPreviewDocuments(docs as JsonDocument[]); setSelectedFileName(file.name);
+      setNotice({kind:"success",text:"JSON parsed successfully. Review the preview before importing."});
+    } catch (error) { setNotice({kind:"error",text:error instanceof Error ? error.message : "Could not read JSON file."}); event.target.value = ""; }
+  }
+  async function importDocuments() {
+    if (!sessionId || !selectedDatabase || !selectedCollection || !previewDocuments.length) return;
+    setImporting(true); setNotice(null); setImportResult(null);
+    try {
+      const response = await fetch("/api/imports", {method:"POST",headers:{"Content-Type":"application/json","X-Session-Id":sessionId},body:JSON.stringify({database:selectedDatabase,collection:selectedCollection,documents:previewDocuments})});
+      const result = await response.json() as {insertedCount?:number;message?:string};
+      if (!response.ok) throw new Error(result.message || "Import failed.");
+      setImportResult({insertedCount:result.insertedCount || 0,database:selectedDatabase,collection:selectedCollection});
+      setNotice({kind:"success",text:"Import completed successfully."});
+    } catch (error) { setNotice({kind:"error",text:error instanceof Error ? error.message : "Import failed."}); }
+    finally { setImporting(false); }
   }
   async function disconnect() {
     if (sessionId) await fetch("/api/connections/current", {method:"DELETE",headers:{"X-Session-Id":sessionId}}).catch(()=>undefined);
