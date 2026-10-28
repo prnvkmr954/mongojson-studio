@@ -90,6 +90,7 @@ export async function findOrCreateGoogleUser(googleId: string, emailInput: strin
   if (existingGoogle?._id) return { id: existingGoogle._id.toHexString(), email: existingGoogle.email };
   const existingEmail = await users.findOne({ email });
   if (existingEmail?._id) {
+    if (existingEmail.googleId && existingEmail.googleId !== googleId) throw new Error("This email is linked to a different Google account.");
     await users.updateOne({ _id: existingEmail._id }, { $set: { googleId } });
     return { id: existingEmail._id.toHexString(), email: existingEmail.email };
   }
