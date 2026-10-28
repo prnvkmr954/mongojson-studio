@@ -17,7 +17,7 @@ export function readAuthCookie(request: Request) {
 }
 export function setAuthCookie(response: Response, token: string, expiresAt: Date) {
   const secure = config.NODE_ENV === "production" ? "; Secure" : "";
-  response.setHeader("Set-Cookie", `${AUTH_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresAt.toUTCString()}${secure}`);
+  response.append("Set-Cookie", `${AUTH_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresAt.toUTCString()}${secure}`);
 }
 export function clearAuthCookie(response: Response) {
   const secure = config.NODE_ENV === "production" ? "; Secure" : "";
