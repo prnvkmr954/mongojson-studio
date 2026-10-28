@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { MongoClient, ObjectId, type Collection, type ObjectId as ObjectIdType } from "mongodb";
 import { config } from "../config.js";
 const scrypt = promisify(scryptCallback);
-type User = { _id?: ObjectId; email: string; passwordHash: string; createdAt: Date };
+type User = { _id?: ObjectId; email: string; passwordHash?: string; googleId?: string; createdAt: Date };
 type AuthSession = { _id?: ObjectIdType; tokenHash: string; userId: ObjectIdType; expiresAt: Date; createdAt: Date };
 let client: MongoClient | null = null;
 let users: Collection<User> | null = null;
@@ -17,6 +17,7 @@ export async function initAuthStore() {
   sessions = authDb.collection<AuthSession>("auth_sessions");
   await Promise.all([
     users.createIndex({ email: 1 }, { unique: true }),
+    users.createIndex({ googleId: 1 }, { unique: true, sparse: true }),
     sessions.createIndex({ tokenHash: 1 }, { unique: true }),
     sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     sessions.createIndex({ userId: 1 })
@@ -54,7 +55,7 @@ export async function loginUser(emailInput: string, password: string) {
   const email = emailInput.trim().toLowerCase();
   const user = await users.findOne({ email });
   // Perform a password hash even for unknown emails to reduce account-enumeration timing differences.
-  const valid = user ? await verifyPassword(password, user.passwordHash) : await verifyPassword(password, "scrypt:00000000000000000000000000000000:" + "00".repeat(64));
+  const valid = user?.passwordHash ? await verifyPassword(password, user.passwordHash) : await verifyPassword(password, "scrypt:00000000000000000000000000000000:" + "00".repeat(64));
   if (!user || !valid || !user._id) throw new Error("Invalid email or password.");
   return { id: user._id.toHexString(), email: user.email };
 }
@@ -80,4 +81,29 @@ export async function deleteAuthSession(token: string) {
 export async function deleteUserSessions(userId: string) {
   const { sessions } = getCollections();
   await sessions.deleteMany({ userId: new ObjectId(userId) });
+}
+
+export async function findOrCreateGoogleUser(googleId: string, emailInput: string) {
+  const { users } = getCollections();
+  const email = emailInput.trim().toLowerCase();
+  const existingGoogle = await users.findOne({ googleId });
+  if (existingGoogle?._id) return { id: existingGoogle._id.toHexString(), email: existingGoogle.email };
+  const existingEmail = await users.findOne({ email });
+  if (existingEmail?._id) {
+    await users.updateOne({ _id: existingEmail._id }, { $set: { googleId } });
+    return { id: existingEmail._id.toHexString(), email: existingEmail.email };
+  }
+  try {
+    const result = await users.insertOne({ email, googleId, createdAt: new Date() });
+    return { id: result.insertedId.toHexString(), email };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === 11000) {
+      const raced = await users.findOne({ $or: [{ googleId }, { email }] });
+      if (raced?._id) {
+        if (!raced.googleId) await users.updateOne({ _id: raced._id }, { $set: { googleId } });
+        return { id: raced._id.toHexString(), email: raced.email };
+      }
+    }
+    throw error;
+  }
 }
