@@ -36,6 +36,7 @@ export async function requireAuth(request: Request, response: Response, next: Ne
 export function requireSameOrigin(request: Request, response: Response, next: NextFunction) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) { next(); return; }
   const origin = request.get("origin");
-  if (!origin || origin !== config.CLIENT_ORIGIN) { response.status(403).json({ message: "Request origin could not be verified." }); return; }
+  let originHost = ""; try { originHost = origin ? new URL(origin).host : ""; } catch { originHost = ""; }
+  if (!originHost || originHost !== request.get("host")) { response.status(403).json({ message: "Request origin could not be verified." }); return; }
   next();
 }
