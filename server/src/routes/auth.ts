@@ -16,7 +16,7 @@ const googleOAuth = config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
 const GOOGLE_STATE_COOKIE = "mongojson_google_state";
 function setGoogleStateCookie(response: import("express").Response, state: string) {
   const secure = config.NODE_ENV === "production" ? "; Secure" : "";
-  response.setHeader("Set-Cookie", `${GOOGLE_STATE_COOKIE}=${state}; Path=/api/auth/google; HttpOnly; SameSite=Lax; Max-Age=600${secure}`);
+  response.append("Set-Cookie", `${GOOGLE_STATE_COOKIE}=${state}; Path=/api/auth/google; HttpOnly; SameSite=Lax; Max-Age=600${secure}`);
 }
 function clearGoogleStateCookie(response: import("express").Response) {
   const secure = config.NODE_ENV === "production" ? "; Secure" : "";
