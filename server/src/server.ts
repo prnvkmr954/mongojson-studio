@@ -4,7 +4,7 @@ import { closeAllSessions } from "./services/session.service.js";
 import { closeAuthStore, initAuthStore } from "./services/auth.service.js";
 async function main() {
   await initAuthStore();
-  const server = app.listen(config.PORT, "127.0.0.1", () => console.info(`MongoJSON Studio API listening on http://127.0.0.1:${config.PORT}`));
+  const server = app.listen(config.PORT, process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1", () => console.info(`MongoJSON Studio API listening on http://127.0.0.1:${config.PORT}`));
   let shuttingDown = false;
   async function shutdown(signal: string) {
     if (shuttingDown) return;
