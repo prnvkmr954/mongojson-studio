@@ -1,6 +1,6 @@
 # MongoJSON Studio
 
-A guided web app for importing JSON documents into MongoDB Atlas.
+A guided web app for importing JSON and BSON backups into MongoDB Atlas, with account authentication.
 
 ## Current milestone
 
@@ -17,6 +17,7 @@ The app includes a React/TypeScript dashboard, session-only Atlas connection, da
 - Node.js 20+
 - npm 10+
 - MongoDB Atlas cluster and database user
+- A separate persistent MongoDB database for application accounts (`AUTH_MONGODB_URI`)
 
 ## Run locally
 
@@ -40,7 +41,7 @@ The connection-test endpoint creates a temporary MongoClient and closes it after
 
 ## Security
 
-Never commit real URIs or credentials. `.env` is gitignored. The API is bound to loopback for local development and avoids logging request bodies. Do not publicly deploy this version before adding authentication, rate limits, strict request limits, outbound-host restrictions/SSRF protection and hardened session handling.
+Never commit real URIs or credentials. `.env` is gitignored. The API is bound to loopback for local development and avoids logging request bodies. This is an authentication foundation, not yet ready for public launch. Before public deployment, add email verification, password reset/recovery, abuse controls (including registration throttling and bot protection), stronger upload and request limits, outbound-host restrictions/SSRF protection for user-supplied MongoDB URIs, security headers/CSP, monitoring, and a security review. Connection sessions are currently in-memory, so use sticky routing or move them to a properly designed shared session service before running multiple API instances. Deploy only behind HTTPS; `Secure` cookies are enabled when `NODE_ENV=production`.
 
 ## Commands
 
