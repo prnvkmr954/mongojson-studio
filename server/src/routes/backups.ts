@@ -33,7 +33,7 @@ function jsonDocuments(buffer: Buffer): Record<string, unknown>[] {
 backupRouter.post("/", upload.array("files", 100), async (request, response) => {
   const sessionId = z.string().min(40).max(128).safeParse(request.header("X-Session-Id"));
   if (!sessionId.success) { response.status(401).json({ message: "Connection session missing or expired. Connect to Atlas again." }); return; }
-  const session = getSession(sessionId.data);
+  const session = getSession(sessionId.data, request.authUser!.id);
   if (!session) { response.status(401).json({ message: "Connection session expired. Connect to Atlas again." }); return; }
   const database = nameSchema.safeParse(request.body?.database);
   const mode = z.enum(["collection", "database"]).safeParse(request.body?.mode);
