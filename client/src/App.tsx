@@ -49,6 +49,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const authErrorCode = new URLSearchParams(window.location.search).get("authError");
+    if (authErrorCode) {
+      const messages: Record<string, string> = {
+        google_not_configured: "Google sign-in is not configured on the server yet.",
+        google_state: "Google sign-in could not verify the request. Please try again.",
+        google_token: "Google did not return a valid sign-in token. Please try again.",
+        google_email: "Google must provide a verified email address.",
+        google_failed: "Google sign-in failed. Please try again."
+      };
+      setAuthError(messages[authErrorCode] || "Sign-in failed. Please try again.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
     let active = true;
     fetch("/api/auth/me", { credentials: "same-origin" }).then(async response => {
       if (!response.ok) return null;
@@ -69,8 +81,13 @@ export default function App() {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: authEmail, password: authPassword })
       });
-      const result = await response.json() as { user?: AuthUser; message?: string };
-      if (!response.ok || !result.user) throw new Error(result.message || "Authentication failed.");
+      const responseText = await response.text();
+      let result: { user?: AuthUser; message?: string } = {};
+      if (responseText.trim()) {
+        try { result = JSON.parse(responseText) as { user?: AuthUser; message?: string }; }
+        catch { throw new Error("The server returned an invalid response. Check the API terminal and authentication database configuration."); }
+      }
+      if (!response.ok || !result.user) throw new Error(result.message || "Authentication failed. The API may be unavailable.");
       setAuthUser(result.user); setAuthStatus("signed-in"); setAuthPassword(""); setAuthError("");
     } catch (error) { setAuthError(error instanceof Error ? error.message : "Authentication failed."); }
     finally { setAuthBusy(false); }
@@ -194,7 +211,7 @@ export default function App() {
   const cls = (...values: Array<string | false>) => values.filter(Boolean).join(" ");
 
   if (authStatus === "loading") return <div className="auth-shell"><div className="auth-card"><div className="brand-mark"><Database size={22}/></div><h1>MongoJSON Studio</h1><p>Checking your session…</p></div></div>;
-  if (authStatus === "signed-out") return <div className="auth-shell"><div className="auth-card"><div className="auth-brand"><span className="brand-mark"><Database size={22}/></span><span><strong>MongoJSON Studio</strong><small>SECURE DATA WORKSPACE</small></span></div><div className="auth-eyebrow">YOUR DATA WORKSPACE</div><h1>{authMode === "register" ? "Create your account" : "Welcome back"}</h1><p className="auth-subtitle">{authMode === "register" ? "Create an account to start importing your data." : "Sign in to continue to your MongoDB import workspace."}</p><form className="auth-form" onSubmit={submitAuth}><label htmlFor="auth-email">Email address</label><input id="auth-email" type="email" autoComplete="email" required maxLength={254} value={authEmail} onChange={event=>setAuthEmail(event.target.value)} placeholder="you@example.com"/><label htmlFor="auth-password">Password</label><input id="auth-password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} required minLength={authMode === "register" ? 12 : 1} maxLength={128} value={authPassword} onChange={event=>setAuthPassword(event.target.value)} placeholder={authMode === "register" ? "At least 12 characters" : "Enter your password"}/>{authMode === "register" && <small className="auth-hint">Use at least 12 characters. Passwords are securely hashed.</small>}{authError && <div className="auth-error"><TriangleAlert size={16}/><span>{authError}</span></div>}<button className="button-primary auth-submit" type="submit" disabled={authBusy}>{authBusy ? <LoaderCircle size={16} className="spin"/> : <LockKeyhole size={16}/>} {authBusy ? "Please wait…" : authMode === "register" ? "Create account" : "Sign in"}</button></form><div className="auth-switch">{authMode === "register" ? "Already have an account?" : "New to MongoJSON Studio?"} <button type="button" onClick={()=>{setAuthMode(authMode === "register" ? "login" : "register");setAuthError("");}}>{authMode === "register" ? "Sign in" : "Create account"}</button></div><div className="auth-security"><ShieldCheck size={17}/><span>Your account is separate from your MongoDB Atlas credentials.</span></div></div></div>;
+  if (authStatus === "signed-out") return <div className="auth-shell"><div className="auth-card"><div className="auth-brand"><span className="brand-mark"><Database size={22}/></span><span><strong>MongoJSON Studio</strong><small>SECURE DATA WORKSPACE</small></span></div><div className="auth-eyebrow">YOUR DATA WORKSPACE</div><h1>{authMode === "register" ? "Create your account" : "Welcome back"}</h1><p className="auth-subtitle">{authMode === "register" ? "Create an account to start importing your data." : "Sign in to continue to your MongoDB import workspace."}</p><form className="auth-form" onSubmit={submitAuth}><label htmlFor="auth-email">Email address</label><input id="auth-email" type="email" autoComplete="email" required maxLength={254} value={authEmail} onChange={event=>setAuthEmail(event.target.value)} placeholder="you@example.com"/><label htmlFor="auth-password">Password</label><input id="auth-password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} required minLength={authMode === "register" ? 12 : 1} maxLength={128} value={authPassword} onChange={event=>setAuthPassword(event.target.value)} placeholder={authMode === "register" ? "At least 12 characters" : "Enter your password"}/>{authMode === "register" && <small className="auth-hint">Use at least 12 characters. Passwords are securely hashed.</small>}{authError && <div className="auth-error"><TriangleAlert size={16}/><span>{authError}</span></div>}<button className="button-primary auth-submit" type="submit" disabled={authBusy}>{authBusy ? <LoaderCircle size={16} className="spin"/> : <LockKeyhole size={16}/>} {authBusy ? "Please wait…" : authMode === "register" ? "Create account" : "Sign in"}</button><div className="auth-divider"><span>OR CONTINUE WITH</span></div><button className="google-signin" type="button" onClick={()=>{window.location.href="/api/auth/google";}}><span className="google-g" aria-hidden="true">G</span>Continue with Google</button></form><div className="auth-switch">{authMode === "register" ? "Already have an account?" : "New to MongoJSON Studio?"} <button type="button" onClick={()=>{setAuthMode(authMode === "register" ? "login" : "register");setAuthError("");}}>{authMode === "register" ? "Sign in" : "Create account"}</button></div><div className="auth-security"><ShieldCheck size={17}/><span>Your account is separate from your MongoDB Atlas credentials.</span></div></div></div>;
   return <div className="app-shell">
     <aside className="sidebar">
       <a className="brand" href="#" onClick={event => {event.preventDefault();setPage("overview");}}><span className="brand-mark"><Database size={21} strokeWidth={2.4}/></span><span className="brand-copy"><strong>MongoJSON</strong><small>STUDIO</small></span></a>
