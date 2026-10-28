@@ -43,7 +43,14 @@ export default function App() {
     event.preventDefault(); setNotice(null); setConnecting(true);
     try {
       const response = await fetch("/api/connections/test", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({connectionString}) });
-      const result = await response.json() as {success?:boolean; message?:string; host?:string};
+      const responseText = await response.text();
+      let result: {success?:boolean; message?:string; host?:string} = {};
+      if (responseText.trim()) {
+        try { result = JSON.parse(responseText) as {success?:boolean; message?:string; host?:string}; }
+        catch { throw new Error("The API returned an invalid response. Check the terminal running the server for startup errors, then restart with: npm run dev"); }
+      } else {
+        throw new Error("The API returned an empty response. Check that the backend is running at http://127.0.0.1:4000. Stop the terminal with Ctrl+C, then run: npm run dev");
+      }
       if (!response.ok || !result.success) throw new Error(result.message || "Could not connect to MongoDB Atlas.");
       setConnected(true); setSessionLabel(result.host || "Atlas cluster"); setNotice({kind:"success",text:"Connection verified. Your connection string is not saved."});
     } catch (error) { setConnected(false); setNotice({kind:"error",text:error instanceof Error ? error.message : "Connection failed. Check the URI and try again."}); }
