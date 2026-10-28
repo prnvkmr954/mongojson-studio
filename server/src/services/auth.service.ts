@@ -1,14 +1,14 @@
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { MongoClient, type Collection, type Db, type ObjectId } from "mongodb";
+import { MongoClient, ObjectId, type Collection, type Db, type ObjectId as ObjectIdType } from "mongodb";
 import { config } from "../config.js";
 const scrypt = promisify(scryptCallback);
 type User = { _id?: ObjectId; email: string; passwordHash: string; createdAt: Date };
-type AuthSession = { _id?: ObjectId; tokenHash: string; userId: ObjectId; expiresAt: Date; createdAt: Date };
+type AuthSession = { _id?: ObjectIdType; tokenHash: string; userId: ObjectIdType; expiresAt: Date; createdAt: Date };
 let client: MongoClient | null = null;
 let db: Db | null = null;
-let users: Collection<User>;
-let sessions: Collection<AuthSession>;
+let users: Collection<User> | null = null;
+let sessions: Collection<AuthSession> | null = null;
 export async function initAuthStore() {
   if (!config.AUTH_MONGODB_URI) throw new Error("AUTH_MONGODB_URI is required. Configure a separate MongoDB database for MongoJSON Studio accounts.");
   client = new MongoClient(config.AUTH_MONGODB_URI, { appName: "MongoJSON-Studio-Auth", serverSelectionTimeoutMS: 10000 });
@@ -63,7 +63,7 @@ export async function createAuthSession(userId: string) {
   const { sessions } = getCollections();
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + config.AUTH_SESSION_TTL_HOURS * 60 * 60 * 1000);
-  await sessions.insertOne({ tokenHash: hashToken(token), userId: new (await import("mongodb")).ObjectId(userId), expiresAt, createdAt: new Date() });
+  await sessions.insertOne({ tokenHash: hashToken(token), userId: new ObjectId(userId), expiresAt, createdAt: new Date() });
   return { token, expiresAt };
 }
 export async function findAuthSession(token: string) {
@@ -80,6 +80,5 @@ export async function deleteAuthSession(token: string) {
 }
 export async function deleteUserSessions(userId: string) {
   const { sessions } = getCollections();
-  const { ObjectId } = await import("mongodb");
   await sessions.deleteMany({ userId: new ObjectId(userId) });
 }
