@@ -11,7 +11,7 @@ const payloadSchema = z.object({
 importRouter.post("/", async (request, response) => {
   const id = z.string().min(40).max(128).safeParse(request.header("X-Session-Id"));
   if (!id.success) { response.status(401).json({ message: "Connection session missing or expired. Connect to Atlas again." }); return; }
-  const session = getSession(id.data);
+  const session = getSession(id.data, request.authUser!.id);
   if (!session) { response.status(401).json({ message: "Connection session expired. Connect to Atlas again." }); return; }
   const parsed = payloadSchema.safeParse(request.body);
   if (!parsed.success) { response.status(400).json({ message: "Provide a database, collection, and a JSON array of documents (up to 10,000)." }); return; }
