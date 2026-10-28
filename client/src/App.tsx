@@ -5,10 +5,19 @@ import { ArrowRight, Check, ChevronDown, CircleHelp, Clock3, Database, FileJson,
 type ApiStatus = "checking" | "online" | "offline";
 type Notice = { kind: "success" | "error" | "info"; text: string } | null;
 type JsonDocument = Record<string, unknown>;
+type AuthUser = { id: string; email: string };
+type AuthStatus = "loading" | "signed-in" | "signed-out";
 const steps = [{ number: "01", title: "Connect", description: "Connect securely to Atlas" }, { number: "02", title: "Destination", description: "Choose a database and collection" }, { number: "03", title: "Import", description: "Preview and insert your JSON" }];
 
 export default function App() {
   const [page, setPage] = useState<"overview" | "import" | "history">("import");
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [apiStatus, setApiStatus] = useState<ApiStatus>("checking");
   const [connectionString, setConnectionString] = useState("");
   const [showUri, setShowUri] = useState(false);
@@ -38,6 +47,41 @@ export default function App() {
     fetch("/api/health").then(response => { if (!response.ok) throw new Error("API unavailable"); return response.json() as Promise<{status:string}>; }).then(() => active && setApiStatus("online")).catch(() => active && setApiStatus("offline"));
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me", { credentials: "same-origin" }).then(async response => {
+      if (!response.ok) return null;
+      const result = await response.json() as { user?: AuthUser };
+      return result.user ?? null;
+    }).then(user => {
+      if (!active) return;
+      setAuthUser(user);
+      setAuthStatus(user ? "signed-in" : "signed-out");
+    }).catch(() => { if (active) { setAuthUser(null); setAuthStatus("signed-out"); setAuthError("Could not reach the API. Start the server and refresh."); } });
+    return () => { active = false; };
+  }, []);
+
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setAuthBusy(true); setAuthError("");
+    try {
+      const response = await fetch("/api/auth/" + (authMode === "register" ? "register" : "login"), {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail, password: authPassword })
+      });
+      const result = await response.json() as { user?: AuthUser; message?: string };
+      if (!response.ok || !result.user) throw new Error(result.message || "Authentication failed.");
+      setAuthUser(result.user); setAuthStatus("signed-in"); setAuthPassword(""); setAuthError("");
+    } catch (error) { setAuthError(error instanceof Error ? error.message : "Authentication failed."); }
+    finally { setAuthBusy(false); }
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+    if (sessionId) await fetch("/api/connections/current", { method: "DELETE", headers: { "X-Session-Id": sessionId } }).catch(() => undefined);
+    setAuthUser(null); setAuthStatus("signed-out"); setConnectionString(""); setSessionId(""); setConnected(false);
+    setDatabases([]); setCollections([]); setSelectedDatabase(""); setSelectedCollection(""); setSessionLabel("");
+  }
 
   async function testConnection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setNotice(null); setConnecting(true);
@@ -149,6 +193,8 @@ export default function App() {
   }
   const cls = (...values: Array<string | false>) => values.filter(Boolean).join(" ");
 
+  if (authStatus === "loading") return <div className="auth-shell"><div className="auth-card"><div className="brand-mark"><Database size={22}/></div><h1>MongoJSON Studio</h1><p>Checking your session…</p></div></div>;
+  if (authStatus === "signed-out") return <div className="auth-shell"><div className="auth-card"><div className="auth-brand"><span className="brand-mark"><Database size={22}/></span><span><strong>MongoJSON Studio</strong><small>SECURE DATA WORKSPACE</small></span></div><div className="auth-eyebrow">YOUR DATA WORKSPACE</div><h1>{authMode === "register" ? "Create your account" : "Welcome back"}</h1><p className="auth-subtitle">{authMode === "register" ? "Create an account to start importing your data." : "Sign in to continue to your MongoDB import workspace."}</p><form className="auth-form" onSubmit={submitAuth}><label htmlFor="auth-email">Email address</label><input id="auth-email" type="email" autoComplete="email" required maxLength={254} value={authEmail} onChange={event=>setAuthEmail(event.target.value)} placeholder="you@example.com"/><label htmlFor="auth-password">Password</label><input id="auth-password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} required minLength={authMode === "register" ? 12 : 1} maxLength={128} value={authPassword} onChange={event=>setAuthPassword(event.target.value)} placeholder={authMode === "register" ? "At least 12 characters" : "Enter your password"}/>{authMode === "register" && <small className="auth-hint">Use at least 12 characters. Passwords are securely hashed.</small>}{authError && <div className="auth-error"><TriangleAlert size={16}/><span>{authError}</span></div>}<button className="button-primary auth-submit" type="submit" disabled={authBusy}>{authBusy ? <LoaderCircle size={16} className="spin"/> : <LockKeyhole size={16}/>} {authBusy ? "Please wait…" : authMode === "register" ? "Create account" : "Sign in"}</button></form><div className="auth-switch">{authMode === "register" ? "Already have an account?" : "New to MongoJSON Studio?"} <button type="button" onClick={()=>{setAuthMode(authMode === "register" ? "login" : "register");setAuthError("");}}>{authMode === "register" ? "Sign in" : "Create account"}</button></div><div className="auth-security"><ShieldCheck size={17}/><span>Your account is separate from your MongoDB Atlas credentials.</span></div></div></div>;
   return <div className="app-shell">
     <aside className="sidebar">
       <a className="brand" href="#" onClick={event => {event.preventDefault();setPage("overview");}}><span className="brand-mark"><Database size={21} strokeWidth={2.4}/></span><span className="brand-copy"><strong>MongoJSON</strong><small>STUDIO</small></span></a>
@@ -161,7 +207,7 @@ export default function App() {
       <div className="sidebar-bottom"><div className="side-section-label">CONNECTION</div><div className="connection-state"><span className={cls("status-dot",connected && "green")}/><span>{connected ? "Connection verified" : "No active connection"}</span></div>{connected && <div className="session-host">{sessionLabel}</div>}<div className="sidebar-tip"><ShieldCheck size={17}/><span><strong>Private by design</strong><small>Credentials are never saved.</small></span></div><div className="sidebar-footer"><span className={apiStatus === "online" ? "api-dot" : "status-dot"}/> API {apiStatus === "checking" ? "checking" : apiStatus === "online" ? "online" : "offline"}<span className="version">v0.1.0</span></div></div>
     </aside>
     <main className="main-area">
-      <header className="topbar"><div className="breadcrumb"><span>Workspace</span><ArrowRight size={14}/><strong>{page === "overview" ? "Overview" : page === "history" ? "Import history" : "Import JSON"}</strong></div><div className="topbar-actions"><span className="environment"><span className="status-dot green"/> Local workspace</span><button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={18}/></button><div className="avatar">MJ</div></div></header>
+      <header className="topbar"><div className="breadcrumb"><span>Workspace</span><ArrowRight size={14}/><strong>{page === "overview" ? "Overview" : page === "history" ? "Import history" : "Import JSON"}</strong></div><div className="topbar-actions"><span className="environment"><span className="status-dot green"/> Local workspace</span><button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={18}/></button><span className="auth-email-label">{authUser?.email}</span><button className="button-secondary topbar-logout" onClick={logout}>Sign out</button></div></header>
       <div className="content">
         {page === "import" ? <>
           <div className="page-heading"><div><div className="eyebrow">DATA WORKSPACE <span>/</span> NEW IMPORT</div><h1>Import JSON</h1><p>Move your documents into MongoDB Atlas in a few simple steps.</p></div><div className="heading-badge"><span className="live-pip"/> Guided workflow</div></div>
