@@ -1,5 +1,8 @@
 import cors from "cors";
 import express, { type ErrorRequestHandler } from "express";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { connectionRouter } from "./routes/connections.js";
 import { destinationRouter } from "./routes/destinations.js";
@@ -18,6 +21,16 @@ app.use("/api/connections", requireAuth, connectionRouter);
 app.use("/api/destinations", requireAuth, destinationRouter);
 app.use("/api/imports", requireAuth, importRouter);
 app.use("/api/imports/backup", requireAuth, backupRouter);
+app.use("/api", (_request, response) => response.status(404).json({ message: "Endpoint not found." }));
+if (config.NODE_ENV === "production") {
+  const clientDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../client/dist");
+  app.use(express.static(clientDist, { index: false }));
+  app.get("*", (_request, response, next) => {
+    const indexFile = resolve(clientDist, "index.html");
+    if (existsSync(indexFile)) response.sendFile(indexFile);
+    else next();
+  });
+}
 app.use((_request, response) => response.status(404).json({ message: "Endpoint not found." }));
 const errors: ErrorRequestHandler = (error: unknown, _request, response, _next) => {
   const message = error instanceof Error ? error.message : "Unexpected server error.";
