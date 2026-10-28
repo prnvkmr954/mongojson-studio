@@ -29,7 +29,7 @@ function stateMatches(a: string, b: string) {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 }
-authRouter.get("/google", (request, response) => {
+authRouter.get("/google", (_request, response) => {
   if (!googleOAuth || !config.GOOGLE_CLIENT_ID) { response.redirect(302, `${config.CLIENT_ORIGIN}/?authError=google_not_configured`); return; }
   const state = randomBytes(32).toString("base64url");
   setGoogleStateCookie(response, state);
