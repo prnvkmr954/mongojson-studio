@@ -1,21 +1,20 @@
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { MongoClient, ObjectId, type Collection, type Db, type ObjectId as ObjectIdType } from "mongodb";
+import { MongoClient, ObjectId, type Collection, type ObjectId as ObjectIdType } from "mongodb";
 import { config } from "../config.js";
 const scrypt = promisify(scryptCallback);
 type User = { _id?: ObjectId; email: string; passwordHash: string; createdAt: Date };
 type AuthSession = { _id?: ObjectIdType; tokenHash: string; userId: ObjectIdType; expiresAt: Date; createdAt: Date };
 let client: MongoClient | null = null;
-let db: Db | null = null;
 let users: Collection<User> | null = null;
 let sessions: Collection<AuthSession> | null = null;
 export async function initAuthStore() {
   if (!config.AUTH_MONGODB_URI) throw new Error("AUTH_MONGODB_URI is required. Configure a separate MongoDB database for MongoJSON Studio accounts.");
   client = new MongoClient(config.AUTH_MONGODB_URI, { appName: "MongoJSON-Studio-Auth", serverSelectionTimeoutMS: 10000 });
   await client.connect();
-  db = client.db(config.AUTH_DATABASE);
-  users = db.collection<User>("users");
-  sessions = db.collection<AuthSession>("auth_sessions");
+  const authDb = client.db(config.AUTH_DATABASE);
+  users = authDb.collection<User>("users");
+  sessions = authDb.collection<AuthSession>("auth_sessions");
   await Promise.all([
     users.createIndex({ email: 1 }, { unique: true }),
     sessions.createIndex({ tokenHash: 1 }, { unique: true }),
@@ -23,7 +22,7 @@ export async function initAuthStore() {
     sessions.createIndex({ userId: 1 })
   ]);
 }
-export async function closeAuthStore() { if (client) await client.close(); client = null; db = null; }
+export async function closeAuthStore() { if (client) await client.close(); client = null; }
 function getCollections() { if (!users || !sessions) throw new Error("Authentication storage is not initialized."); return { users, sessions }; }
 function hashToken(token: string) { return createHash("sha256").update(token).digest("hex"); }
 async function passwordHash(password: string) {
