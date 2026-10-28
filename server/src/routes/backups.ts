@@ -7,7 +7,7 @@ import { config } from "../config.js";
 
 export const backupRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.MAX_UPLOAD_MB * 1024 * 1024, files: 100 } });
-const nameSchema = z.string().trim().min(1).max(120).refine(name => !/[.$/\\\\\u0000-\u001f]/.test(name), "Invalid MongoDB name.");
+const nameSchema = z.string().trim().min(1).max(120).refine(name => !name.includes("$") && !name.includes(".") && !name.includes("/") && !name.includes("\\") && !/[\u0000-\u001f]/.test(name), "Invalid MongoDB name.");
 function bsonDocuments(buffer: Buffer): Record<string, unknown>[] {
   const documents: Record<string, unknown>[] = [];
   let offset = 0;
